@@ -7,7 +7,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use sqlx::postgres::PgPoolOptions;
 use tracing::info;
-use tracing_subscriber::{fmt, EnvFilter};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 use adapters::{postgres_repo::PostgresBalanceRepo, redis_consumer::RedisConsumer};
 
@@ -17,7 +17,7 @@ async fn main() -> Result<()> {
 
     tracing_subscriber::registry()
         .with(EnvFilter::from_default_env().add_directive("info".parse()?))
-        .with(fmt::layer().json())
+        .with(tracing_subscriber::fmt::layer().json())
         .init();
 
     let db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL required");

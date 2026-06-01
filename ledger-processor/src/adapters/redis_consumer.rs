@@ -1,6 +1,8 @@
 use anyhow::{Context, Result};
+use futures_util::StreamExt;
 use redis::aio::PubSub;
 use redis::AsyncCommands;
+use std::sync::Arc;
 use tracing::{error, info, warn};
 
 use crate::domain::transaction::{BalanceUpdatedEvent, TransactionCreatedEvent, TransactionType};
@@ -9,11 +11,11 @@ use crate::ports::BalanceRepository;
 pub struct RedisConsumer {
     pubsub: PubSub,
     publisher: redis::aio::MultiplexedConnection,
-    repo: std::sync::Arc<dyn BalanceRepository>,
+    repo: Arc<dyn BalanceRepository>,
 }
 
 impl RedisConsumer {
-    pub async fn new(redis_url: &str, repo: std::sync::Arc<dyn BalanceRepository>) -> Result<Self> {
+    pub async fn new(redis_url: &str, repo: Arc<dyn BalanceRepository>) -> Result<Self> {
         let client = redis::Client::open(redis_url)?;
         let pubsub = client.get_async_pubsub().await?;
         let publisher = client.get_multiplexed_async_connection().await?;
@@ -32,8 +34,16 @@ impl RedisConsumer {
 
         info!("ledger-processor subscribed to transactions.created");
 
-        use futures_util::StreamExt;
-        let mut stream = self.pubsub.on_message();
+        // Destructure to avoid simultaneous mutable borrows: `stream` holds a
+        // reference to `pubsub`, so we must separate it from `publisher` and `repo`
+        // before entering the loop.
+        let Self {
+            pubsub,
+            mut publisher,
+            repo,
+        } = self;
+
+        let mut stream = pubsub.on_message();
 
         while let Some(msg) = stream.next().await {
             let payload: String = match msg.get_payload() {
@@ -52,35 +62,39 @@ impl RedisConsumer {
                 }
             };
 
-            if let Err(e) = self.process(&event).await {
+            if let Err(e) = process_event(&mut publisher, repo.as_ref(), &event).await {
                 error!(tx_id = %event.transaction_id, "process failed: {e}");
             }
         }
         Ok(())
     }
+}
 
-    async fn process(&mut self, event: &TransactionCreatedEvent) -> Result<()> {
-        let delta = match event.transaction_type {
-            TransactionType::Credit => event.amount_cents,
-            TransactionType::Debit => -event.amount_cents,
-        };
+async fn process_event(
+    publisher: &mut redis::aio::MultiplexedConnection,
+    repo: &dyn BalanceRepository,
+    event: &TransactionCreatedEvent,
+) -> Result<()> {
+    let delta = match event.transaction_type {
+        TransactionType::Credit => event.amount_cents,
+        TransactionType::Debit => -event.amount_cents,
+    };
 
-        let new_balance = self.repo.apply_delta(event.account_id, delta).await?;
-        self.repo.mark_completed(event.transaction_id).await?;
+    let new_balance = repo.apply_delta(event.account_id, delta).await?;
+    repo.mark_completed(event.transaction_id).await?;
 
-        let update = BalanceUpdatedEvent::new(event.account_id, new_balance);
-        let json = serde_json::to_string(&update)?;
-        self.publisher
-            .publish::<_, _, ()>("accounts.balance_updated", json)
-            .await?;
+    let update = BalanceUpdatedEvent::new(event.account_id, new_balance);
+    let json = serde_json::to_string(&update)?;
+    publisher
+        .publish::<_, _, ()>("accounts.balance_updated", json)
+        .await?;
 
-        info!(
-            tx_id = %event.transaction_id,
-            account = %event.account_id,
-            delta = delta,
-            balance = new_balance,
-            "balance updated"
-        );
-        Ok(())
-    }
+    info!(
+        tx_id = %event.transaction_id,
+        account = %event.account_id,
+        delta = delta,
+        balance = new_balance,
+        "balance updated"
+    );
+    Ok(())
 }

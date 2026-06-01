@@ -6,6 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
 	pgadapter "github.com/suphakin-th/ledger-service/ledger-api/internal/adapters/postgres"
@@ -19,7 +20,7 @@ func setupTestDB(t *testing.T, ctx context.Context) *pgxpool.Pool {
 		postgres.WithDatabase("ledger_test"),
 		postgres.WithUsername("ledger"),
 		postgres.WithPassword("ledger"),
-		postgres.WithWaitStrategy(
+		testcontainers.WithWaitStrategy(
 			wait.ForLog("database system is ready to accept connections").WithOccurrence(2),
 		),
 	)
