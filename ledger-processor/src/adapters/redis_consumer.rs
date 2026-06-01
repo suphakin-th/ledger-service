@@ -38,7 +38,7 @@ impl RedisConsumer {
         // reference to `pubsub`, so we must separate it from `publisher` and `repo`
         // before entering the loop.
         let Self {
-            pubsub,
+            mut pubsub,
             mut publisher,
             repo,
         } = self;
