@@ -1,0 +1,16 @@
+# Go
+ledger-api/bin/
+ledger-api/vendor/
+
+# Rust
+ledger-processor/target/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
