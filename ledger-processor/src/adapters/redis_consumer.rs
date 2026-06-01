@@ -17,7 +17,11 @@ impl RedisConsumer {
         let client = redis::Client::open(redis_url)?;
         let pubsub = client.get_async_pubsub().await?;
         let publisher = client.get_multiplexed_async_connection().await?;
-        Ok(Self { pubsub, publisher, repo })
+        Ok(Self {
+            pubsub,
+            publisher,
+            repo,
+        })
     }
 
     pub async fn run(mut self) -> Result<()> {
@@ -34,12 +38,18 @@ impl RedisConsumer {
         while let Some(msg) = stream.next().await {
             let payload: String = match msg.get_payload() {
                 Ok(p) => p,
-                Err(e) => { error!("read payload: {e}"); continue; }
+                Err(e) => {
+                    error!("read payload: {e}");
+                    continue;
+                }
             };
 
             let event: TransactionCreatedEvent = match serde_json::from_str(&payload) {
                 Ok(e) => e,
-                Err(e) => { warn!("deserialize event: {e}"); continue; }
+                Err(e) => {
+                    warn!("deserialize event: {e}");
+                    continue;
+                }
             };
 
             if let Err(e) = self.process(&event).await {
@@ -51,8 +61,8 @@ impl RedisConsumer {
 
     async fn process(&mut self, event: &TransactionCreatedEvent) -> Result<()> {
         let delta = match event.transaction_type {
-            TransactionType::Credit =>  event.amount_cents,
-            TransactionType::Debit  => -event.amount_cents,
+            TransactionType::Credit => event.amount_cents,
+            TransactionType::Debit => -event.amount_cents,
         };
 
         let new_balance = self.repo.apply_delta(event.account_id, delta).await?;
@@ -65,10 +75,10 @@ impl RedisConsumer {
             .await?;
 
         info!(
-            tx_id    = %event.transaction_id,
-            account  = %event.account_id,
-            delta    = delta,
-            balance  = new_balance,
+            tx_id = %event.transaction_id,
+            account = %event.account_id,
+            delta = delta,
+            balance = new_balance,
             "balance updated"
         );
         Ok(())

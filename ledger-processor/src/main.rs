@@ -20,7 +20,7 @@ async fn main() -> Result<()> {
         .with(fmt::layer().json())
         .init();
 
-    let db_url    = std::env::var("DATABASE_URL").expect("DATABASE_URL required");
+    let db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL required");
     let redis_url = std::env::var("REDIS_URL").expect("REDIS_URL required");
 
     let pool = PgPoolOptions::new()
