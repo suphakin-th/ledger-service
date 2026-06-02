@@ -9,14 +9,14 @@ pub enum TransactionType {
     Debit,
 }
 
+// Serde ignores unknown fields by default, so removing currency and
+// occurred_at does not break deserialization of existing Redis messages.
 #[derive(Debug, Clone, Deserialize)]
 pub struct TransactionCreatedEvent {
     pub transaction_id: Uuid,
     pub account_id: Uuid,
     pub transaction_type: TransactionType,
     pub amount_cents: i64,
-    pub currency: String,
-    pub occurred_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize)]
