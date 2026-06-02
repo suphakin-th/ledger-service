@@ -2,6 +2,13 @@
 
 # ledger-service
 
+![Go](https://img.shields.io/badge/Go-Gin-00ADD8?logo=go&logoColor=white)
+![Rust](https://img.shields.io/badge/Rust-Tokio-000000?logo=rust&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-Pub%2FSub-DC382D?logo=redis&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+![Architecture](https://img.shields.io/badge/Architecture-Hexagonal-5C4EE5)
+
 Event-driven financial ledger built as two independent microservices: a Go REST API and a Rust async processor communicating via Redis pub/sub. Each service owns its layer of the stack.
 
 ---
